@@ -1,4 +1,5 @@
 # Streamlit App for BMI Prediction
+# Based on the paper: https://cdn.aaai.org/ojs/14923/14923-28-18442-1-2-20201228.pdf
 
 import os
 import streamlit as st
@@ -8,7 +9,6 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
-from io import BytesIO
 import tensorflow as tf
 
 # Import our BMI predictor
@@ -27,12 +27,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Create the BMI predictor
+# Function to get predictor
 @st.cache_resource
 def get_predictor():
     return BMIPredictor(MODEL_PATH if os.path.exists(MODEL_PATH) else None)
 
-predictor = get_predictor()
+# Initialize predictor at startup
+if 'predictor' not in st.session_state:
+    st.session_state.predictor = get_predictor()
 
 # Function to display BMI category with color
 def display_bmi_category(bmi, category):
@@ -72,6 +74,9 @@ def train_model():
     # Create placeholders for progress updates
     status_text = st.empty()
     
+    # Create a new predictor for training
+    predictor = BMIPredictor()
+    
     # Load data
     X, y = predictor.load_data(DATA_PATH, IMAGE_PATH)
     
@@ -96,6 +101,11 @@ def train_model():
         restore_best_weights=True
     )
     
+    # Parameters
+    epochs = 50  # You can make this a parameter
+    batch_size = 4  # You can make this a parameter
+    validation_split = 0.2  # You can make this a parameter
+    
     # Custom callback for Streamlit progress updates
     class StreamlitCallback(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
@@ -109,12 +119,6 @@ def train_model():
     
     # Create and train the model
     st.info("Creating and training the model...")
-    
-    # Parameters
-    epochs = 50  # You can make this a parameter
-    batch_size = 4  # You can make this a parameter
-    validation_split = 0.2  # You can make this a parameter
-    
     model = predictor.create_model()
     history = predictor.train(
         X, y, 
@@ -156,9 +160,11 @@ def train_model():
     plt.savefig(history_plot_path)
     st.success(f"Training history plot saved to {history_plot_path}")
     
-    # Reload the predictor with the new model
-    global predictor
-    predictor = BMIPredictor(MODEL_PATH)
+    # Update the predictor in session state
+    st.session_state.predictor = BMIPredictor(MODEL_PATH)
+    
+    # Show success message
+    st.success("Model has been trained successfully and is ready to use!")
 
 # Function to preprocess and predict BMI from an image
 def predict_from_image(image):
@@ -171,6 +177,9 @@ def predict_from_image(image):
     
     # Process face
     with st.spinner("Processing image..."):
+        # Get the predictor from session state
+        predictor = st.session_state.predictor
+        
         # Detect face
         faces = predictor.detector.detect_faces(img_array)
         
@@ -179,7 +188,7 @@ def predict_from_image(image):
             processed_img = cv2.resize(img_array, (224, 224))
             
             # Display the processed image
-            st.image(processed_img, caption="Processed Image", use_column_width=True)
+            st.image(processed_img, caption="Processed Image (No face detected)", use_column_width=True)
         else:
             # Get the largest face
             face = max(faces, key=lambda x: x['box'][2] * x['box'][3])
