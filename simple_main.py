@@ -95,6 +95,32 @@ def display_menu():
     choice = input("Enter your choice (0-2): ")
     return choice
 
+def create_model(self):
+    # VGG Face model with the pre-trained weights
+    base_model = get_vgg_face_model(include_top=False, input_shape=(224, 224, 3))
+    
+    # We are freezing the base model layers
+    for layer in base_model.layers:
+        layer.trainable = False
+    
+    # Custom regression layers
+    x = base_model.output
+    
+    # Add a unique name to the Flatten layer to avoid conflicts
+    x = Flatten(name='flatten_regression')(x)
+    x = Dense(512, activation='relu', name='dense_regression_1')(x)
+    x = Dropout(0.5, name='dropout_regression_1')(x)
+    x = Dense(128, activation='relu', name='dense_regression_2')(x)
+    x = Dropout(0.5, name='dropout_regression_2')(x)
+    predictions = Dense(1, activation='linear', name='bmi_output')(x)  # BMI is a continuous value
+    
+    model = Model(inputs=base_model.input, outputs=predictions)
+    
+    model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
+    
+    self.model = model
+    return model
+
 def main():
     while True:
         choice = display_menu()

@@ -1,10 +1,4 @@
-# VGG-Face Compatibility Fix for newer TensorFlow/Keras versions
-
-"""
-This file provides a compatibility layer for using VGG-Face with newer versions of TensorFlow/Keras.
-This implementation is a simplified version that loads the VGG-16 model architecture
-and the VGG-Face weights directly using TensorFlow/Keras.
-"""
+# VGG-Face Compatibility for newer tensorflow keras versions
 
 import os
 import numpy as np
@@ -13,36 +7,25 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.utils import get_file
 
-# Constants for VGG-Face
+# VGG-Face
 WEIGHTS_PATH = 'https://github.com/rcmalli/keras-vggface/releases/download/v2.0/rcmalli_vggface_tf_vgg16.h5'
 WEIGHTS_PATH_NO_TOP = 'https://github.com/rcmalli/keras-vggface/releases/download/v2.0/rcmalli_vggface_tf_notop_vgg16.h5'
 
 def VGGFace(include_top=True, model='vgg16', weights='vggface', input_tensor=None, input_shape=(224, 224, 3), pooling=None, classes=2622):
     """
-    Instantiates the VGG16 architecture for the VGGFace model.
-    
     Parameters:
-        include_top: whether to include the 3 fully-connected layers at the top of the network.
-        model: which model to use ('vgg16' is the only option in this simplified version)
-        weights: one of `None` (random initialization), 'vggface' (pre-trained on VGGFace dataset),
-            or the path to the weights file to be loaded.
-        input_tensor: optional Keras tensor (i.e. output of `layers.Input()`) to use as image input for the model.
-        input_shape: optional shape tuple, only to be specified if `include_top` is False.
-        pooling: Optional pooling mode for feature extraction when `include_top` is `False`.
-            - `None` means that the output of the model will be the 4D tensor output of the last convolutional block.
-            - `avg` means that global average pooling will be applied to the output of the last convolutional block, and thus
-                the output would be a 2D tensor.
-            - `max` means that global max pooling will be applied.
-        classes: optional number of classes to classify images into, only to be specified if `include_top` is True.
-    
-    Returns:
-        A Keras model instance.
+        include_top: if we should include the 3 fully connected layers.
+        model: which model to use.
+        input_tensor: image input for the model.
+        input_shape: only specify if include top is False.
+        pooling: for feature extraction when include top is False.
+        classes: optional number of classes to classify images into, only if include top is True.
     """
     
     if model != 'vgg16':
         raise ValueError("Only 'vgg16' is supported in this simplified implementation.")
     
-    # Determine input tensor
+    # The input tensor
     if input_tensor is None:
         img_input = Input(shape=input_shape)
     else:
@@ -93,13 +76,12 @@ def VGGFace(include_top=True, model='vgg16', weights='vggface', input_tensor=Non
         elif pooling == 'max':
             x = tf.keras.layers.GlobalMaxPooling2D()(x)
         else:
-            # Just return the flattened features
+            # Flattened features
             x = Flatten(name='flatten')(x)
 
-    # Create model
     model = Model(img_input, x, name='vggface_vgg16')
 
-    # Load weights
+    # Weights
     if weights == 'vggface':
         if include_top:
             weights_path = get_file('rcmalli_vggface_tf_vgg16.h5',
@@ -116,18 +98,6 @@ def VGGFace(include_top=True, model='vgg16', weights='vggface', input_tensor=Non
     return model
 
 def preprocess_input(x, data_format=None, version=1):
-    """
-    Preprocesses a tensor or Numpy array encoding a batch of images.
-    
-    Parameters:
-        x: Input Numpy or symbolic tensor, 3D or 4D.
-        data_format: Data format of the image tensor/array.
-        version: V1 or V2. V1 is the same as used in original VGG, i.e. BGR mode. 
-                While V2 is the new implementation of VGG in Keras applications (RGB mode)
-    
-    Returns:
-        Preprocessed tensor or Numpy array.
-    """
     if data_format is None:
         data_format = tf.keras.backend.image_data_format()
     assert data_format in {'channels_last', 'channels_first'}
@@ -189,19 +159,6 @@ def preprocess_input(x, data_format=None, version=1):
     return x
 
 def get_vgg_face_model(include_top=True, input_shape=(224, 224, 3), classes=2622, weights='vggface'):
-    """
-    Get a VGG-Face model with optional pre-trained weights
-    
-    Args:
-        include_top: Whether to include the top (classification) layers
-        input_shape: Input image shape
-        classes: Number of classes for the top layer (if include_top=True)
-        weights: One of 'vggface' (pre-trained on VGGFace dataset), 
-                 path to weights file, or None (random initialization)
-        
-    Returns:
-        A Keras model
-    """
     return VGGFace(include_top=include_top, 
                   input_shape=input_shape, 
                   classes=classes,

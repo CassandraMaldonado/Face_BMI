@@ -1,15 +1,10 @@
-# Streamlit App for BMI Prediction
-# Based on the paper: https://cdn.aaai.org/ojs/14923/14923-28-18442-1-2-20201228.pdf
-
 import os
 import streamlit as st
 import numpy as np
 import pandas as pd
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
-import tensorflow as tf
 
 # Import our BMI predictor
 from bmi_prediction import BMIPredictor
@@ -28,7 +23,6 @@ st.set_page_config(
 )
 
 # Function to get predictor
-@st.cache_resource
 def get_predictor():
     return BMIPredictor(MODEL_PATH if os.path.exists(MODEL_PATH) else None)
 
@@ -86,47 +80,45 @@ def train_model():
     
     st.success(f"Loaded {len(X)} images for training")
     
-    # Create callbacks
-    checkpoint = ModelCheckpoint(
-        MODEL_PATH,
-        monitor='val_loss',
-        save_best_only=True,
-        verbose=1
-    )
-    
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        patience=10,
-        verbose=1,
-        restore_best_weights=True
-    )
-    
     # Parameters
     epochs = 50  # You can make this a parameter
     batch_size = 4  # You can make this a parameter
     validation_split = 0.2  # You can make this a parameter
     
-    # Custom callback for Streamlit progress updates
-    class StreamlitCallback(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            progress = (epoch + 1) / epochs
-            progress_bar.progress(progress)
-            status_text.text(f"Training Progress: {int(progress * 100)}% - Epoch {epoch+1}/{epochs}")
-            
-            # Display current metrics
-            st.text(f"Loss: {logs['loss']:.4f}, Val Loss: {logs['val_loss']:.4f}")
-            st.text(f"MAE: {logs['mae']:.4f}, Val MAE: {logs['val_mae']:.4f}")
-    
     # Create and train the model
     st.info("Creating and training the model...")
     model = predictor.create_model()
-    history = predictor.train(
-        X, y, 
-        epochs=epochs,
-        batch_size=batch_size,
-        validation_split=validation_split,
-        callbacks=[checkpoint, early_stopping, StreamlitCallback()]
-    )
+    
+    # Set up progress monitoring
+    progress_text = st.empty()
+    
+    def update_progress(epoch, epochs):
+        progress = (epoch + 1) / epochs
+        progress_bar.progress(progress)
+        progress_text.text(f"Training Progress: {int(progress * 100)}% - Epoch {epoch+1}/{epochs}")
+    
+    # Train in smaller chunks to show progress
+    history = {'loss': [], 'val_loss': [], 'mae': [], 'val_mae': []}
+    
+    # Train for each epoch
+    for epoch in range(epochs):
+        update_progress(epoch, epochs)
+        h = model.fit(
+            X, y,
+            epochs=1,
+            batch_size=batch_size,
+            validation_split=validation_split,
+            verbose=0
+        )
+        # Collect metrics
+        history['loss'].append(h.history['loss'][0])
+        history['val_loss'].append(h.history['val_loss'][0])
+        history['mae'].append(h.history['mae'][0])
+        history['val_mae'].append(h.history['val_mae'][0])
+        
+        # Show current metrics
+        st.text(f"Loss: {h.history['loss'][0]:.4f}, Val Loss: {h.history['val_loss'][0]:.4f}")
+        st.text(f"MAE: {h.history['mae'][0]:.4f}, Val MAE: {h.history['val_mae'][0]:.4f}")
     
     # Save the model
     predictor.save_model(MODEL_PATH)
@@ -137,16 +129,16 @@ def train_model():
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     
     # Plot training & validation loss
-    ax1.plot(history.history['loss'])
-    ax1.plot(history.history['val_loss'])
+    ax1.plot(history['loss'])
+    ax1.plot(history['val_loss'])
     ax1.set_title('Model Loss')
     ax1.set_ylabel('Loss')
     ax1.set_xlabel('Epoch')
     ax1.legend(['Train', 'Validation'], loc='upper right')
     
     # Plot training & validation mean absolute error
-    ax2.plot(history.history['mae'])
-    ax2.plot(history.history['val_mae'])
+    ax2.plot(history['mae'])
+    ax2.plot(history['val_mae'])
     ax2.set_title('Model Mean Absolute Error')
     ax2.set_ylabel('MAE')
     ax2.set_xlabel('Epoch')
