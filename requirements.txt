@@ -1,7 +1,8 @@
-numpy==1.24.3
-pandas==2.0.3
-streamlit==1.32.0
-matplotlib==3.7.3
-scikit-learn==1.3.2
-xgboost==2.0.3
-plotly==5.18.0
+tensorflow==2.10.0
+streamlit==1.22.0
+opencv-python==4.7.0.72
+pillow==9.4.0
+mtcnn==0.1.1
+pandas==1.5.3
+numpy==1.24.2
+matplotlib==3.7.1
