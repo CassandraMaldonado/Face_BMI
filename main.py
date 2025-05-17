@@ -1,161 +1,126 @@
-# Face to BMI
+# Face to BMI 
 
 import os
 import argparse
-import pandas as pd  # Added this import for the test function
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+import traceback
 
-# Our BMI predictor
+# Importing our BMI predictor
 from bmi_prediction import BMIPredictor
 
-# Define your specific paths
-DATA_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/data.csv"
-IMAGE_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/Images"
-MODEL_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/bmi_predictor_model.h5"
-HISTORY_PLOT_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/training_history.png"
+# Relative paths
+DATA_PATH = "data.csv"
+IMAGE_PATH = "Images"
+MODEL_PATH = "bmi_predictor_model.h5"
+HISTORY_PLOT_PATH = "training_history.png"
 
 def train_model():
-    predictor = BMIPredictor()
+    try:
+        # BMI predictor
+        predictor = BMIPredictor()
+        
+        # Dataset
+        X, y = predictor.load_data(DATA_PATH, IMAGE_PATH)
+        
+        if len(X) == 0:
+            print("Error: No valid images were loaded. Check your data paths.")
+            return False
+        
+        print(f"Successfully loaded {len(X)} images with corresponding BMI values")
+        
+        print("Creating the model...")
+        model = predictor.create_model()
+        if model is None:
+            print("Error: Failed to create model")
+            return False
+        
+        # Model summary
+        print("Model created successfully. Summary:")
+        model.summary()
+        
+        # Checking the directory
+        model_dir = os.path.dirname(os.path.abspath(MODEL_PATH))
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+            print(f"Created directory: {model_dir}")
+        
+        checkpoint = ModelCheckpoint(
+            MODEL_PATH,
+            monitor='val_loss',
+            save_best_only=True,
+            verbose=1
+        )
+        
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            patience=10,
+            verbose=1,
+            restore_best_weights=True
+        )
+        
+        # Model
+        print("Training the model...")
+        history = predictor.train(
+            X, y, 
+            epochs=50, 
+            batch_size=4,  
+            validation_split=0.2,
+            callbacks=[checkpoint, early_stopping]
+        )
+        
+        # Saving the model
+        print(f"Attempting to save model to {MODEL_PATH}...")
+        predictor.save_model(MODEL_PATH)
+        
+        # Verifying the model was saved
+        if os.path.exists(MODEL_PATH):
+            file_size_mb = os.path.getsize(MODEL_PATH) / (1024 * 1024)
+            print(f"Model successfully saved! File size: {file_size_mb:.2f} MB")
+        else:
+            print(f"Warning: Model file not found at {MODEL_PATH} after saving")
+        
+        # History plots
+        predictor.save_training_plot(history, HISTORY_PLOT_PATH)
+        print(f"Training history plot saved to {HISTORY_PLOT_PATH}")
+        
+        return True
     
-    X, y = predictor.load_data(DATA_PATH, IMAGE_PATH)
-    
-    if len(X) == 0:
-        print("Error: No images were loaded.")
+    except Exception as e:
+        print(f"Error during model training: {str(e)}")
+        traceback.print_exc()  
         return False
-    
-    print(f"Successfully loaded {len(X)} images with corresponding BMI values")
-    
-    # Callbacks for training
-    checkpoint = ModelCheckpoint(
-        MODEL_PATH,
-        monitor='val_loss',
-        save_best_only=True,
-        verbose=1
-    )
-    
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        patience=10,
-        verbose=1,
-        restore_best_weights=True
-    )
-    
-    # Create the model
-    model = predictor.create_model()
-    history = predictor.train(
-        X, y, 
-        epochs=50, 
-        batch_size=4, 
-        validation_split=0.2,
-        callbacks=[checkpoint, early_stopping]
-    )
-    
-    predictor.save_model(MODEL_PATH)
-    print(f"Model saved to {MODEL_PATH}")
-    
-    # Training history
-    predictor.save_training_plot(history, HISTORY_PLOT_PATH)
-    print(f"Training history plot saved to {HISTORY_PLOT_PATH}")
-    
-    return True
 
 def predict_bmi(image_path):
-    if not os.path.exists(MODEL_PATH):
-        print(f"Error: Model not found at {MODEL_PATH}.")
+    try:
+        if not os.path.exists(MODEL_PATH):
+            print(f"Error: Model not found at {MODEL_PATH}. Train the model first.")
+            return None, None
+        
+        # Generated a predictor with the model
+        print(f"Loading model from {MODEL_PATH}...")
+        predictor = BMIPredictor(MODEL_PATH)
+        
+        # Predicting the BMI
+        bmi, category = predictor.predict_bmi(image_path=image_path)
+        
+        if bmi is None:
+            print("Error: Could not process the image")
+            return None, None
+        
+        print(f"Predicted BMI: {bmi:.2f}")
+        print(f"Category: {category}")
+        
+        return bmi, category
+    
+    except Exception as e:
+        print(f"Error during BMI prediction: {str(e)}")
+        traceback.print_exc()  
         return None, None
-    
-    predictor = BMIPredictor(MODEL_PATH)
-    
-    # Predicting BMI
-    bmi, category = predictor.predict_bmi(image_path=image_path)
-    
-    if bmi is None:
-        print("Error: Could not process the image")
-        return None, None
-    
-    print(f"Predicted BMI: {bmi:.2f}")
-    print(f"Category: {category}")
-    
-    return bmi, category
-
-def test_model():
-    """Test the BMI prediction model using test images from the dataset"""
-    print("Testing model on test images...")
-    
-    if not os.path.exists(MODEL_PATH):
-        print(f"Error: Model not found at {MODEL_PATH}. Train the model first.")
-        return False
-    
-    # Predictor with the trained model
-    predictor = BMIPredictor(MODEL_PATH)
-    
-    # Load the full dataset
-    df = pd.read_csv(DATA_PATH)
-    
-    # Subset for testing with 20% of the data
-    test_df = df.sample(frac=0.2, random_state=42)
-    print(f"Selected {len(test_df)} images for testing")
-    
-    results = []
-    
-    # Testing each image
-    for idx, row in test_df.iterrows():
-        image_path = os.path.join(IMAGE_PATH, row['name'])
-        
-        if not os.path.exists(image_path):
-            print(f"Warning: Image {image_path} not found")
-            continue
-        
-        # Actual BMI
-        actual_bmi = row['bmi']
-        
-        # BMI prediction
-        predicted_bmi, category = predictor.predict_bmi(image_path=image_path)
-        
-        if predicted_bmi is not None:
-            # Error
-            error = abs(predicted_bmi - actual_bmi)
-            
-            results.append({
-                'image': row['name'],
-                'actual_bmi': actual_bmi,
-                'predicted_bmi': predicted_bmi,
-                'category': category,
-                'error': error
-            })
-            
-            print(f"Image: {row['name']}")
-            print(f"  Actual BMI: {actual_bmi:.2f}")
-            print(f"  Predicted BMI: {predicted_bmi:.2f}")
-            print(f"  Error: {error:.2f}")
-            print(f"  Category: {category}")
-            print("---")
-    
-    # Metrics
-    if results:
-        errors = [r['error'] for r in results]
-        mean_error = sum(errors) / len(errors)
-        max_error = max(errors)
-        min_error = min(errors)
-        
-        print("\nTest Results Summary:")
-        print(f"Number of test images: {len(results)}")
-        print(f"Mean Absolute Error: {mean_error:.2f}")
-        print(f"Max Error: {max_error:.2f}")
-        print(f"Min Error: {min_error:.2f}")
-        
-        # Save results to CSV
-        results_df = pd.DataFrame(results)
-        results_df.to_csv("test_results.csv", index=False)
-        print("Detailed results saved to test_results.csv")
-    
-    return True
 
 def main():
-    # Argument
     parser = argparse.ArgumentParser(description='Face to BMI Prediction')
-    parser.add_argument('--mode', type=str, choices=['train', 'predict', 'test'], required=True,
-                        help='Mode: train model, predict BMI, or test model')
+    parser.add_argument('--mode', type=str, choices=['train', 'predict'], required=True,
+                        help='Mode: train model or predict BMI')
     parser.add_argument('--image', type=str, help='Path to image for prediction (required in predict mode)')
     
     args = parser.parse_args()
@@ -169,7 +134,7 @@ def main():
             
     elif args.mode == 'predict':
         if not args.image:
-            print("Error: Image is required in predict mode")
+            print("Error: --image argument is required in predict mode")
             return
             
         if not os.path.exists(args.image):
@@ -177,9 +142,6 @@ def main():
             return
             
         predict_bmi(args.image)
-    
-    elif args.mode == 'test':
-        test_model()
 
 if __name__ == "__main__":
     main()
