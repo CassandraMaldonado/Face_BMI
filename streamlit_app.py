@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 # Import our BMI predictor
 from bmi_prediction import BMIPredictor
 
-# Set up your specific paths
-DATA_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/data.csv"
-IMAGE_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/Images"
-MODEL_PATH = "/Users/casey/Documents/GitHub/Face_to_BMI/bmi_predictor_model.h5"
+# Set up paths (changed to relative paths)
+DATA_PATH = "data.csv"
+IMAGE_PATH = "Images"
+MODEL_PATH = "bmi_predictor_model.h5"
 
 # Page configuration
 st.set_page_config(
@@ -24,7 +24,11 @@ st.set_page_config(
 
 # Function to get predictor
 def get_predictor():
-    return BMIPredictor(MODEL_PATH if os.path.exists(MODEL_PATH) else None)
+    try:
+        return BMIPredictor(MODEL_PATH if os.path.exists(MODEL_PATH) else None)
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
 
 # Initialize predictor at startup
 if 'predictor' not in st.session_state:
@@ -121,8 +125,21 @@ def train_model():
         st.text(f"MAE: {h.history['mae'][0]:.4f}, Val MAE: {h.history['val_mae'][0]:.4f}")
     
     # Save the model
-    predictor.save_model(MODEL_PATH)
-    st.success(f"Model saved to {MODEL_PATH}")
+    try:
+        # Create directory if it doesn't exist
+        model_dir = os.path.dirname(os.path.abspath(MODEL_PATH))
+        if not os.path.exists(model_dir) and model_dir:
+            os.makedirs(model_dir)
+            
+        predictor.save_model(MODEL_PATH)
+        
+        if os.path.exists(MODEL_PATH):
+            file_size_mb = os.path.getsize(MODEL_PATH) / (1024 * 1024)
+            st.success(f"Model saved to {MODEL_PATH} (Size: {file_size_mb:.2f} MB)")
+        else:
+            st.error(f"Failed to save model. File not found at {MODEL_PATH}")
+    except Exception as e:
+        st.error(f"Error saving model: {str(e)}")
     
     # Display training history plot
     st.subheader("Training History")
@@ -148,7 +165,7 @@ def train_model():
     st.pyplot(fig)
     
     # Save the plot
-    history_plot_path = "/Users/casey/Documents/GitHub/Face_to_BMI/training_history.png"
+    history_plot_path = "training_history.png"
     plt.savefig(history_plot_path)
     st.success(f"Training history plot saved to {history_plot_path}")
     
@@ -172,6 +189,10 @@ def predict_from_image(image):
         # Get the predictor from session state
         predictor = st.session_state.predictor
         
+        if predictor is None:
+            st.error("BMI predictor not initialized. Please reload the page or train the model.")
+            return
+            
         # Detect face
         faces = predictor.detector.detect_faces(img_array)
         
@@ -203,15 +224,19 @@ def predict_from_image(image):
             processed_img = cv2.resize(face_img, (224, 224))
         
         # Make prediction
-        bmi, category = predictor.predict_bmi(img=processed_img)
-        
-        if bmi is None:
-            st.error("Could not predict BMI from the image.")
+        try:
+            bmi, category = predictor.predict_bmi(img=processed_img)
+            
+            if bmi is None:
+                st.error("Could not predict BMI from the image.")
+                return
+            
+            # Display results
+            st.subheader("Prediction Results")
+            display_bmi_category(bmi, category)
+        except Exception as e:
+            st.error(f"Error during prediction: {str(e)}")
             return
-        
-        # Display results
-        st.subheader("Prediction Results")
-        display_bmi_category(bmi, category)
 
 # Main app interface
 def main():
@@ -334,20 +359,44 @@ def main():
         
         if not model_exists:
             st.error(f"Model not found at {MODEL_PATH}. Please train the model first.")
-            return
-        
-        # Upload image
-        uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "bmp"])
-        
-        if uploaded_file is not None:
-            # Read the image
-            image = Image.open(uploaded_file)
+        else:
+            # Option to use webcam
+            input_option = st.radio("Choose input method:", ["Upload Image", "Use Webcam"])
             
-            # Display the original image
-            st.image(image, caption="Uploaded Image", use_column_width=True)
-            
-            # Process the image and predict
-            predict_from_image(image)
+            if input_option == "Use Webcam":
+                img_file_buffer = st.camera_input("Take a picture")
+                if img_file_buffer is not None:
+                    # Process webcam image
+                    image = Image.open(img_file_buffer)
+                    st.image(image, caption="Captured Image", use_column_width=True)
+                    predict_from_image(image)
+            else:
+                # Upload image
+                uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "bmp"])
+                
+                if uploaded_file is not None:
+                    # Read the image
+                    image = Image.open(uploaded_file)
+                    
+                    # Display the original image
+                    st.image(image, caption="Uploaded Image", use_column_width=True)
+                    
+                    # Process the image and predict
+                    predict_from_image(image)
+                
+                # Demo option
+                st.markdown("---")
+                st.write("Don't have an image? Try with a demo image:")
+                
+                # Check if demo image exists
+                demo_image_path = "demo_face.jpg"
+                if os.path.exists(demo_image_path):
+                    if st.button("Try with Demo Image"):
+                        demo_image = Image.open(demo_image_path)
+                        st.image(demo_image, caption="Demo Image", use_column_width=True)
+                        predict_from_image(demo_image)
+                else:
+                    st.info("Demo image not found. Add a file named 'demo_face.jpg' to your project directory to enable this feature.")
 
 if __name__ == "__main__":
     main()
