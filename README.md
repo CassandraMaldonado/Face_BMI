@@ -2,6 +2,8 @@
 
 This project implements a BMI prediction system from facial images based on the paper: [Face to BMI: Using Computer Vision to Infer Body Mass Index on Social Media](https://cdn.aaai.org/ojs/14923/14923-28-18442-1-2-20201228.pdf)
 
+This application uses deep learning to predict Body Mass Index (BMI) from facial images. Built using a VGG-Face model with custom regression layers, it demonstrates how facial features can potentially correlate with BMI values. The app provides a user-friendly web interface through Streamlit, allowing users to train a model on their dataset and make predictions from uploaded images or webcam captures.
+
 ## Project Structure
 
 The project consists of several Python files:
@@ -10,32 +12,11 @@ The project consists of several Python files:
 2. `bmi_prediction.py`: BMI prediction functionality
 3. `main.py`: Command-line interface for training and prediction
 4. `simple_main.py`: Interactive menu-based interface 
-5. `app.py`: Flask web application for BMI prediction
-6. `streamlit_app.py`: Streamlit web application for BMI prediction (more user-friendly)
+5. `streamlit_app.py`: Streamlit web application for BMI prediction (more user-friendly)
 
-## Usage Options
+## How It Works
+The system uses a transfer learning approach:
 
-### Interactive Menu
-
-Run the simple_main.py script for an interactive menu-based interface:
-
-This will display a menu with options to:
-1. Train the model
-2. Predict BMI from an image
-0. Exit
-
-### Command-line Arguments
-
-Run the main.py script with appropriate command-line arguments:
-
-To train the model:
-```bash
-python main.py --mode train
-```
-
-To predict BMI from an image:
-```bash
-python main.py --mode predict --image /path/to/your/image.jpg
-```
-
-### Web Interface with Streamlit
+- Base Model: Pre-trained VGG-Face model that has learned facial feature extraction.
+- Custom Layers: Additional regression layers to predict BMI from facial features.
+- Training Process: Fine-tuning the regression layers while keeping the base model frozen.
