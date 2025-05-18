@@ -1,7 +1,8 @@
 import streamlit as st
-import numpy as np
 from PIL import Image
-import cv2
+import numpy as np
+import random
+import time
 
 # Page configuration
 st.set_page_config(
@@ -22,31 +23,49 @@ def display_bmi_category(bmi, category):
     elif category == 'Obesity':
         st.markdown(f"<div style='background-color:#FFA07A;padding:10px;border-radius:5px;text-align:center;'><strong>Category:</strong> {category} (BMI: {bmi:.2f})</div>", unsafe_allow_html=True)
 
+# Simulate face detection without OpenCV
+def draw_rectangle(image):
+    # Create a copy of the image
+    img_with_rect = image.copy()
+    
+    # Get a drawing context
+    from PIL import ImageDraw
+    draw = ImageDraw.Draw(img_with_rect)
+    
+    # Get image dimensions
+    width, height = image.size
+    
+    # Determine face area (simplified - just use center of image)
+    center_x, center_y = width // 2, height // 2
+    box_size = min(width, height) // 2
+    x = center_x - box_size // 2
+    y = center_y - box_size // 2
+    
+    # Draw rectangle
+    draw.rectangle([(x, y), (x + box_size, y + box_size)], outline=(0, 255, 0), width=3)
+    
+    return img_with_rect
+
 # Simulated face detection and BMI prediction
 def demo_prediction(image):
-    # Convert PIL Image to numpy array
-    img_array = np.array(image)
-    
-    # Process face (simulated)
     with st.spinner("Processing image..."):
         try:
-            # Simplified face detection - just for demo
-            height, width = img_array.shape[:2]
-            center_x, center_y = width // 2, height // 2
-            box_size = min(width, height) // 2
-            x = center_x - box_size // 2
-            y = center_y - box_size // 2
-            w = h = box_size
+            # Simulate processing delay
+            time.sleep(1.5)
             
             # Draw rectangle on the face
-            img_with_rect = img_array.copy()
-            cv2.rectangle(img_with_rect, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            img_with_rect = draw_rectangle(image)
             
             # Display the image with rectangle
             st.image(img_with_rect, caption="Simulated Face Detection", use_column_width=True)
             
+            # Simulate more processing
+            progress_bar = st.progress(0)
+            for i in range(101):
+                progress_bar.progress(i/100)
+                time.sleep(0.01)
+            
             # Simulate a BMI prediction
-            import random
             bmi = random.uniform(18.0, 32.0)
             
             # Determine BMI category
@@ -61,7 +80,7 @@ def demo_prediction(image):
             
             # Display results
             st.subheader("Demo Prediction Results")
-            st.warning("This is a simulated prediction for demo purposes only")
+            st.warning("This is a simulated prediction for demo purposes only. In the full app, a real AI model would make accurate predictions.")
             display_bmi_category(bmi, category)
             
         except Exception as e:
@@ -71,7 +90,7 @@ def demo_prediction(image):
 # Main app
 st.title("Face to BMI Prediction Demo")
 st.write("Upload a face image to see a simulated BMI prediction")
-st.info("Note: This is a demo version without the actual ML model. It shows how the UI would work but doesn't make real predictions.")
+st.info("Note: This is a demo version without the actual ML model. It shows how the UI would work but makes random predictions for demonstration purposes.")
 
 # Upload image
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "bmp"])
@@ -89,6 +108,24 @@ if uploaded_file is not None:
             demo_prediction(image)
     except Exception as e:
         st.error(f"Error processing image: {str(e)}")
+
+# About section
+st.markdown("---")
+st.subheader("About This Project")
+st.write("""
+This application demonstrates how facial features might correlate with BMI values. 
+In the full version, a deep learning model based on VGG-Face architecture analyzes 
+facial features to predict BMI.
+
+The model is trained on a dataset of face images with known BMI values, leveraging 
+transfer learning to repurpose facial recognition capabilities for BMI estimation.
+
+**Technical Components:**
+- Face detection using MTCNN
+- Feature extraction with VGG-Face
+- Custom regression layers for BMI prediction
+- Streamlit for the user interface
+""")
 
 # Footer
 st.markdown("---")
